@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copyright (C) 2026 The uwuAOSP Project
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="org.uwuaosp.prism">
+
+    <uses-permission android:name="android.permission.READ_LOGS" />
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="org.uwuaosp.aicore.permission.USE_OCR" />
+
+    <application
+        android:allowBackup="false"
+        android:icon="@drawable/ic_prism"
+        android:label="@string/app_name"
+        android:roundIcon="@drawable/ic_prism"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.SubSettingsBase">
+
+        <activity
+            android:name=".PrismSettingsActivity"
+            android:exported="true"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="org.uwuaosp.prism.action.SETTINGS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".PrismCaptureActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/capture_title"
+            android:permission="org.uwuaosp.aicore.permission.USE_OCR"
+            android:theme="@style/Theme.Prism.Capture" />
+    </application>
+</manifest>

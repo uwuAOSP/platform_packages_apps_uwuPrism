@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Copyright (C) 2026 The uwuAOSP Project
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+         http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+-->
+<resources>
+    <string name="app_name">uwuPrism-OCR</string>
+    <string name="capture_title">Screen recognition</string>
+    <string name="category_capture">Screen recognition</string>
+    <string name="three_finger_gesture">Three-finger screen recognition</string>
+    <string name="three_finger_gesture_summary">Swipe up with three fingers to capture the current screen</string>
+    <string name="category_model">OCR model</string>
+    <string name="model_status">Model status</string>
+    <string name="model_missing">Not downloaded</string>
+    <string name="model_downloading">Downloading, %1$d%%</string>
+    <string name="model_verifying">Verifying files</string>
+    <string name="model_ready">Ready</string>
+    <string name="model_error">Download failed</string>
+    <string name="download_model">Download OCR model</string>
+    <string name="cancel_download">Cancel download</string>
+    <string name="delete_model">Delete OCR model</string>
+    <string name="model_download_title">Download OCR model?</string>
+    <string name="model_download_message">Download required model files from GitHub. Total size: 1.03 GB.</string>
+    <string name="model_delete_title">Delete OCR model?</string>
+    <string name="model_delete_message">Screen text recognition will be unavailable until the model is downloaded again.</string>
+    <string name="download">Download</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="category_experimental">Experimental</string>
+    <string name="vulkan_backend">Vulkan acceleration</string>
+    <string name="vulkan_backend_summary">Try GPU acceleration</string>
+    <string name="category_diagnostics">Diagnostics</string>
+    <string name="export_logs">Export logs</string>
+    <string name="log_export_failed">Could not export logs</string>
+    <string name="selection_text">Text</string>
+    <string name="selection_image">Image</string>
+    <string name="selection_hint">Drag on an empty area to add a region</string>
+    <string name="selection_label_text">Text %1$d</string>
+    <string name="selection_label_image">Image %1$d</string>
+    <string name="delete_selection">Delete region</string>
+    <string name="copy">Copy</string>
+    <string name="more_exports">More export options</string>
+    <string name="export_pdf">PDF</string>
+    <string name="export_txt">TXT</string>
+    <string name="export_images">Images</string>
+    <string name="pdf_file_name">uwuPrism.pdf</string>
+    <string name="txt_file_name">uwuPrism.txt</string>
+    <string name="nothing_selected">Add at least one region</string>
+    <string name="working">Processing…</string>
+    <string name="recognizing_region">Recognizing text %1$d of %2$d</string>
+    <string name="copy_complete">Copied text and saved %1$d image(s)</string>
+    <string name="copy_text_complete">Text copied</string>
+    <string name="save_images_complete">Saved %1$d image(s) to Pictures/uwuPrism</string>
+    <string name="export_complete">Export complete</string>
+    <string name="export_failed">Export failed: %1$s</string>
+    <string name="capture_failed">Could not read the screenshot</string>
+    <string name="service_unavailable">OCR service is unavailable</string>
+    <string name="model_required">Download the OCR model to recognize text</string>
+    <string name="close">Close</string>
+    <string name="download_progress">%1$.1f MB of %2$.1f MB</string>
+</resources>
