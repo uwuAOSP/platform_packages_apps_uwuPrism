@@ -25,13 +25,20 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.SwipeUp
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -42,6 +49,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -156,12 +164,26 @@ private fun PrismSettingsScreen(
     var useVulkan by remember {
         mutableStateOf(preferences.getBoolean(PREF_USE_VULKAN, false))
     }
+    var ocrEngine by remember {
+        mutableStateOf(
+            OcrEngine.fromPreference(
+                preferences.getString(PREF_OCR_ENGINE, OcrEngine.Tesseract.preferenceValue),
+            ),
+        )
+    }
+    var showEngineDialog by remember { mutableStateOf(false) }
     var showDownloadDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
     var promptedForMissingModel by remember { mutableStateOf(false) }
+    val selectOcrEngine: (OcrEngine) -> Unit = { candidate ->
+        ocrEngine = candidate
+        preferences.edit().putString(PREF_OCR_ENGINE, candidate.preferenceValue).apply()
+        showEngineDialog = false
+    }
 
     LaunchedEffect(modelState.connected, modelState.status) {
         if (
+            ocrEngine == OcrEngine.LocalModel &&
             modelState.connected &&
             modelState.status == OcrModelStatus.MISSING &&
             !promptedForMissingModel
@@ -195,55 +217,74 @@ private fun PrismSettingsScreen(
         )
 
         Spacer(modifier = Modifier.height(8.dp))
-        SettingsCategory(title = stringResource(R.string.category_model))
+        SettingsCategory(title = stringResource(R.string.category_ocr_engine))
         PreferenceRow(
-            title = stringResource(R.string.model_status),
-            summary = modelStatusText(modelState),
-            position = PreferencePosition.Top,
+            title = stringResource(R.string.ocr_engine),
+            summary = stringResource(
+                if (ocrEngine == OcrEngine.LocalModel) {
+                    R.string.ocr_engine_local_model
+                } else {
+                    R.string.ocr_engine_tesseract
+                },
+            ),
             iconContent = {
-                SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
+                SettingsHomepageIcon(imageVector = Icons.Filled.TextFields)
             },
-            onClick = {},
-        )
-        PreferenceGroupSpacer()
-        PreferenceRow(
-            title = when (modelState.status) {
-                OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
-                    stringResource(R.string.cancel_download)
-                OcrModelStatus.READY -> stringResource(R.string.delete_model)
-                else -> stringResource(R.string.download_model)
-            },
-            summary = modelActionSummary(modelState),
-            showSummary = modelState.totalBytes > 0,
-            enabled = modelState.connected,
-            position = PreferencePosition.Bottom,
-            iconContent = {
-                SettingsHomepageIcon(imageVector = Icons.Filled.Memory)
-            },
-            onClick = {
-                when (modelState.status) {
-                    OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
-                        ocrClient.cancelDownload()
-                    OcrModelStatus.READY -> showDeleteDialog = true
-                    else -> showDownloadDialog = true
-                }
-            },
+            onClick = { showEngineDialog = true },
         )
 
-        Spacer(modifier = Modifier.height(8.dp))
-        SettingsCategory(title = stringResource(R.string.category_experimental))
-        SwitchPreferenceRow(
-            title = stringResource(R.string.vulkan_backend),
-            summary = stringResource(R.string.vulkan_backend_summary),
-            checked = useVulkan,
-            onCheckedChange = { enabled ->
-                useVulkan = enabled
-                preferences.edit().putBoolean(PREF_USE_VULKAN, enabled).apply()
-            },
-            iconContent = {
-                SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
-            },
-        )
+        if (ocrEngine == OcrEngine.LocalModel) {
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsCategory(title = stringResource(R.string.category_model))
+            PreferenceRow(
+                title = stringResource(R.string.model_status),
+                summary = modelStatusText(modelState),
+                position = PreferencePosition.Top,
+                iconContent = {
+                    SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
+                },
+                onClick = {},
+            )
+            PreferenceGroupSpacer()
+            PreferenceRow(
+                title = when (modelState.status) {
+                    OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
+                        stringResource(R.string.cancel_download)
+                    OcrModelStatus.READY -> stringResource(R.string.delete_model)
+                    else -> stringResource(R.string.download_model)
+                },
+                summary = modelActionSummary(modelState),
+                showSummary = modelState.totalBytes > 0,
+                enabled = modelState.connected,
+                position = PreferencePosition.Bottom,
+                iconContent = {
+                    SettingsHomepageIcon(imageVector = Icons.Filled.Memory)
+                },
+                onClick = {
+                    when (modelState.status) {
+                        OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
+                            ocrClient.cancelDownload()
+                        OcrModelStatus.READY -> showDeleteDialog = true
+                        else -> showDownloadDialog = true
+                    }
+                },
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsCategory(title = stringResource(R.string.category_experimental))
+            SwitchPreferenceRow(
+                title = stringResource(R.string.vulkan_backend),
+                summary = stringResource(R.string.vulkan_backend_summary),
+                checked = useVulkan,
+                onCheckedChange = { enabled ->
+                    useVulkan = enabled
+                    preferences.edit().putBoolean(PREF_USE_VULKAN, enabled).apply()
+                },
+                iconContent = {
+                    SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
+                },
+            )
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
         SettingsCategory(title = stringResource(R.string.category_diagnostics))
@@ -276,6 +317,58 @@ private fun PrismSettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showDownloadDialog = false }) {
                     Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
+    if (showEngineDialog) {
+        AlertDialog(
+            onDismissRequest = { showEngineDialog = false },
+            title = { Text(stringResource(R.string.ocr_engine)) },
+            text = {
+                Column {
+                    OcrEngine.entries.forEach { candidate ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectOcrEngine(candidate)
+                                }
+                                .padding(vertical = 8.dp),
+                        ) {
+                            RadioButton(
+                                selected = candidate == ocrEngine,
+                                onClick = { selectOcrEngine(candidate) },
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    stringResource(
+                                        if (candidate == OcrEngine.LocalModel) {
+                                            R.string.ocr_engine_local_model
+                                        } else {
+                                            R.string.ocr_engine_tesseract
+                                        },
+                                    ),
+                                )
+                                Text(
+                                    stringResource(
+                                        if (candidate == OcrEngine.LocalModel) {
+                                            R.string.ocr_engine_local_model_summary
+                                        } else {
+                                            R.string.ocr_engine_tesseract_summary
+                                        },
+                                    ),
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showEngineDialog = false }) {
+                    Text(stringResource(R.string.close))
                 }
             },
         )
@@ -331,3 +424,4 @@ private fun modelActionSummary(state: OcrModelState): String {
 
 internal const val PRISM_PREFERENCES = "uwu_prism_preferences"
 internal const val PREF_USE_VULKAN = "use_vulkan"
+internal const val PREF_OCR_ENGINE = "ocr_engine"

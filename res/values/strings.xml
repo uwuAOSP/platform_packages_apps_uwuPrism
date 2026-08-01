@@ -21,6 +21,12 @@
     <string name="three_finger_gesture">Three-finger screen recognition</string>
     <string name="three_finger_gesture_summary">Swipe up with three fingers to capture the current screen</string>
     <string name="category_model">OCR model</string>
+    <string name="category_ocr_engine">OCR engine</string>
+    <string name="ocr_engine">OCR engine</string>
+    <string name="ocr_engine_local_model">Local model</string>
+    <string name="ocr_engine_local_model_summary">GLM-OCR, requires the downloaded model</string>
+    <string name="ocr_engine_tesseract">Lightweight Tesseract</string>
+    <string name="ocr_engine_tesseract_summary">Built in for Chinese and English, no model download required</string>
     <string name="model_status">Model status</string>
     <string name="model_missing">Not downloaded</string>
     <string name="model_downloading">Downloading, %1$d%%</string>

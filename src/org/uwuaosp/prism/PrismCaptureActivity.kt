@@ -108,7 +108,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import java.io.File
 import kotlin.math.abs
@@ -130,6 +129,7 @@ class PrismCaptureActivity : ComponentActivity() {
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var ocrClient: OcrClient
     private lateinit var controller: CaptureController
+    private lateinit var ocrEngine: OcrEngine
     private var screenshotUri: Uri? = null
 
     private val pdfExporter = registerForActivityResult(
@@ -156,9 +156,18 @@ class PrismCaptureActivity : ComponentActivity() {
             return
         }
 
+        ocrEngine = selectedOcrEngine(this)
         ocrClient = OcrClient(this)
-        controller = CaptureController(this, ocrClient, activityScope)
-        ocrClient.connect()
+        controller = CaptureController(this, ocrClient, activityScope, ocrEngine)
+        if (ocrEngine == OcrEngine.LocalModel) {
+            ocrClient.connect(
+                prewarmOcr = true,
+                useVulkan = getSharedPreferences(
+                    PRISM_PREFERENCES,
+                    Context.MODE_PRIVATE,
+                ).getBoolean(PREF_USE_VULKAN, false),
+            )
+        }
 
         setContent {
             PrismTheme {
@@ -174,6 +183,7 @@ class PrismCaptureActivity : ComponentActivity() {
                     CaptureScreen(
                         controller = controller,
                         modelState = ocrClient.modelState.collectAsState().value,
+                        ocrEngine = ocrEngine,
                         onClose = ::finish,
                         onExportPdf = {
                             pdfExporter.launch(getString(R.string.pdf_file_name))
@@ -241,6 +251,7 @@ private class CaptureController(
     private val context: Context,
     private val ocrClient: OcrClient,
     private val scope: CoroutineScope,
+    private val ocrEngine: OcrEngine,
 ) {
     private val _bitmap = MutableStateFlow<Bitmap?>(null)
     val bitmap: StateFlow<Bitmap?> = _bitmap.asStateFlow()
@@ -348,6 +359,7 @@ private class CaptureController(
     }
 
     private fun ensureModelReady(): Boolean {
+        if (ocrEngine == OcrEngine.Tesseract) return true
         val state = ocrClient.modelState.value
         if (state.status == OcrModelStatus.READY) return true
         showModelDownloadDialog = true
@@ -392,11 +404,16 @@ private class CaptureController(
                         )
                         val file = writeTemporaryCrop(context, crop, selection.id)
                         val text = try {
-                            val useVulkan = context.getSharedPreferences(
-                                PRISM_PREFERENCES,
-                                Context.MODE_PRIVATE,
-                            ).getBoolean(PREF_USE_VULKAN, false)
-                            ocrClient.recognize(file, useVulkan)
+                            when (ocrEngine) {
+                                OcrEngine.LocalModel -> {
+                                    val useVulkan = context.getSharedPreferences(
+                                        PRISM_PREFERENCES,
+                                        Context.MODE_PRIVATE,
+                                    ).getBoolean(PREF_USE_VULKAN, false)
+                                    ocrClient.recognize(file, useVulkan)
+                                }
+                                OcrEngine.Tesseract -> TesseractOcr.recognize(context, file)
+                            }
                         } finally {
                             file.delete()
                         }
@@ -425,6 +442,7 @@ private class CaptureController(
 private fun CaptureScreen(
     controller: CaptureController,
     modelState: OcrModelState,
+    ocrEngine: OcrEngine,
     onClose: () -> Unit,
     onExportPdf: () -> Unit,
     onExportText: () -> Unit,
@@ -432,8 +450,9 @@ private fun CaptureScreen(
     val bitmap = controller.bitmap.collectAsState().value ?: return
     var promptedForMissingModel by remember { mutableStateOf(false) }
 
-    LaunchedEffect(modelState.connected, modelState.status) {
+    LaunchedEffect(ocrEngine, modelState.connected, modelState.status) {
         if (
+            ocrEngine == OcrEngine.LocalModel &&
             modelState.connected &&
             modelState.status == OcrModelStatus.MISSING &&
             !promptedForMissingModel
@@ -731,54 +750,55 @@ private fun BoxScope.CaptureBottomControls(
                     )
                 }
             }
-            Surface(
-                modifier = Modifier
-                    .height(60.dp)
-                    .width(62.dp)
-                    .clickable { onExpandedChange(true) }
-                    .semantics {
-                        contentDescription = moreExportsDescription
-                    },
-                shape = RoundedCornerShape(
-                    topStart = 5.dp,
-                    bottomStart = 5.dp,
-                    topEnd = 30.dp,
-                    bottomEnd = 30.dp,
-                ),
-                color = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shadowElevation = 5.dp,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowUp,
-                        contentDescription = stringResource(R.string.more_exports),
+            Box {
+                Surface(
+                    modifier = Modifier
+                        .height(60.dp)
+                        .width(62.dp)
+                        .clickable { onExpandedChange(true) }
+                        .semantics {
+                            contentDescription = moreExportsDescription
+                        },
+                    shape = RoundedCornerShape(
+                        topStart = 5.dp,
+                        bottomStart = 5.dp,
+                        topEnd = 30.dp,
+                        bottomEnd = 30.dp,
+                    ),
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shadowElevation = 5.dp,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowUp,
+                            contentDescription = stringResource(R.string.more_exports),
+                        )
+                    }
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { onExpandedChange(false) },
+                    modifier = Modifier.widthIn(min = 180.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 3.dp,
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.export_pdf)) },
+                        onClick = onExportPdf,
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.export_txt)) },
+                        onClick = onExportText,
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.export_images)) },
+                        onClick = onExportImages,
                     )
                 }
             }
-        }
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { onExpandedChange(false) },
-            offset = DpOffset(x = 0.dp, y = (-204).dp),
-            modifier = Modifier.widthIn(min = 180.dp),
-            shape = RoundedCornerShape(16.dp),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-            tonalElevation = 0.dp,
-            shadowElevation = 3.dp,
-        ) {
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.export_pdf)) },
-                onClick = onExportPdf,
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.export_txt)) },
-                onClick = onExportText,
-            )
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.export_images)) },
-                onClick = onExportImages,
-            )
         }
     }
 }

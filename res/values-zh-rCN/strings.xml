@@ -21,6 +21,12 @@
     <string name="three_finger_gesture">三指识屏</string>
     <string name="three_finger_gesture_summary">三指上滑截取当前屏幕</string>
     <string name="category_model">OCR 模型</string>
+    <string name="category_ocr_engine">OCR 引擎</string>
+    <string name="ocr_engine">OCR 引擎</string>
+    <string name="ocr_engine_local_model">本地模型</string>
+    <string name="ocr_engine_local_model_summary">GLM-OCR，需要下载模型文件</string>
+    <string name="ocr_engine_tesseract">轻量 Tesseract</string>
+    <string name="ocr_engine_tesseract_summary">内置中英文识别，无需下载模型</string>
     <string name="model_status">模型状态</string>
     <string name="model_missing">未下载</string>
     <string name="model_downloading">正在下载，%1$d%%</string>

@@ -19,13 +19,18 @@ android_app {
 
     srcs: ["src/**/*.kt"],
     resource_dirs: ["res"],
+    asset_dirs: ["assets"],
     manifest: "AndroidManifest.xml",
 
     platform_apis: true,
     system_ext_specific: true,
     certificate: "platform",
     privileged: true,
+    use_embedded_native_libs: true,
+    jni_libs: ["libuwu_prism_tesseract_jni"],
     required: ["privapp_whitelist_org.uwuaosp.prism"],
+
+    aaptflags: ["-0", "traineddata"],
 
     static_libs: [
         "androidx.activity_activity",
@@ -54,6 +59,32 @@ android_app {
         proguard_flags_files: ["proguard-rules.pro"],
         shrink_resources: true,
     },
+}
+
+cc_library_shared {
+    name: "libuwu_prism_tesseract_jni",
+    srcs: ["jni/uwu_prism_tesseract_jni.cpp"],
+    system_ext_specific: true,
+    compile_multilib: "64",
+    cpp_std: "c++17",
+    rtti: true,
+    lto: {
+        never: true,
+    },
+    include_dirs: [
+        "external/leptonica/src",
+        "external/tesseract/include",
+    ],
+    header_libs: ["jni_headers"],
+    static_libs: [
+        "libtesseract",
+        "libleptonica",
+    ],
+    shared_libs: [
+        "liblog",
+        "libpng",
+        "libz",
+    ],
 }
 
 prebuilt_etc {

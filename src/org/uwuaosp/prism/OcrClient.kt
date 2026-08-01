@@ -132,9 +132,15 @@ internal class OcrClient(private val context: Context) {
         }
     }
 
-    fun connect() {
+    fun connect(
+        prewarmOcr: Boolean = false,
+        useVulkan: Boolean = false,
+    ) {
         if (bound) return
-        val intent = Intent(OCR_BIND_ACTION).setPackage(AI_CORE_PACKAGE)
+        val intent = Intent(OCR_BIND_ACTION)
+            .setPackage(AI_CORE_PACKAGE)
+            .putExtra(EXTRA_PREWARM_OCR, prewarmOcr)
+            .putExtra(EXTRA_USE_VULKAN, useVulkan)
         bound = context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         if (!bound) {
             _modelState.value = _modelState.value.copy(connected = false)
@@ -198,6 +204,8 @@ internal class OcrClient(private val context: Context) {
     private companion object {
         const val TAG = "uwuPrism"
         const val AI_CORE_PACKAGE = "org.uwuaosp.aicore"
+        const val EXTRA_PREWARM_OCR = "org.uwuaosp.prism.extra.PREWARM_OCR"
+        const val EXTRA_USE_VULKAN = "org.uwuaosp.prism.extra.USE_VULKAN"
     }
 }
 
