@@ -15,7 +15,7 @@
     limitations under the License.
 -->
 <resources>
-    <string name="app_name">uwuPrism-OCR</string>
+    <string name="app_name">Prism</string>
     <string name="capture_title">识屏</string>
     <string name="category_capture">识屏</string>
     <string name="three_finger_gesture">三指识屏</string>
