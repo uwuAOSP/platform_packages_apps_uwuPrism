@@ -59,12 +59,10 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
-import org.uwuaosp.compose.settingslib.PreferenceGroupSpacer
-import org.uwuaosp.compose.settingslib.PreferencePosition
 import org.uwuaosp.compose.settingslib.PreferenceRow
-import org.uwuaosp.compose.settingslib.SettingsCategory
 import org.uwuaosp.compose.settingslib.SettingsHomepageIcon
 import org.uwuaosp.compose.settingslib.SettingsScaffold
+import org.uwuaosp.compose.settingslib.SettingsSection
 import org.uwuaosp.compose.settingslib.SwitchPreferenceRow
 
 class PrismSettingsActivity : ComponentActivity() {
@@ -198,105 +196,119 @@ private fun PrismSettingsScreen(
         showBackButton = true,
         onNavigateUp = onNavigateUp,
     ) {
-        SettingsCategory(title = stringResource(R.string.category_capture))
-        SwitchPreferenceRow(
-            title = stringResource(R.string.three_finger_gesture),
-            summary = stringResource(R.string.three_finger_gesture_summary),
-            checked = gestureEnabled,
-            onCheckedChange = { enabled ->
-                gestureEnabled = enabled
-                Settings.Secure.putInt(
-                    context.contentResolver,
-                    THREE_FINGER_SETTING,
-                    if (enabled) 1 else 0,
+        SettingsSection(title = stringResource(R.string.category_capture)) {
+            item {
+                SwitchPreferenceRow(
+                    title = stringResource(R.string.three_finger_gesture),
+                    summary = stringResource(R.string.three_finger_gesture_summary),
+                    checked = gestureEnabled,
+                    onCheckedChange = { enabled ->
+                        gestureEnabled = enabled
+                        Settings.Secure.putInt(
+                            context.contentResolver,
+                            THREE_FINGER_SETTING,
+                            if (enabled) 1 else 0,
+                        )
+                    },
+                    iconContent = {
+                        SettingsHomepageIcon(imageVector = Icons.Filled.SwipeUp)
+                    },
                 )
-            },
-            iconContent = {
-                SettingsHomepageIcon(imageVector = Icons.Filled.SwipeUp)
-            },
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-        SettingsCategory(title = stringResource(R.string.category_ocr_engine))
-        PreferenceRow(
-            title = stringResource(R.string.ocr_engine),
-            summary = stringResource(
-                if (ocrEngine == OcrEngine.LocalModel) {
-                    R.string.ocr_engine_local_model
-                } else {
-                    R.string.ocr_engine_tesseract
-                },
-            ),
-            iconContent = {
-                SettingsHomepageIcon(imageVector = Icons.Filled.TextFields)
-            },
-            onClick = { showEngineDialog = true },
-        )
-
-        if (ocrEngine == OcrEngine.LocalModel) {
-            Spacer(modifier = Modifier.height(8.dp))
-            SettingsCategory(title = stringResource(R.string.category_model))
-            PreferenceRow(
-                title = stringResource(R.string.model_status),
-                summary = modelStatusText(modelState),
-                position = PreferencePosition.Top,
-                iconContent = {
-                    SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
-                },
-                onClick = {},
-            )
-            PreferenceGroupSpacer()
-            PreferenceRow(
-                title = when (modelState.status) {
-                    OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
-                        stringResource(R.string.cancel_download)
-                    OcrModelStatus.READY -> stringResource(R.string.delete_model)
-                    else -> stringResource(R.string.download_model)
-                },
-                summary = modelActionSummary(modelState),
-                showSummary = modelState.totalBytes > 0,
-                enabled = modelState.connected,
-                position = PreferencePosition.Bottom,
-                iconContent = {
-                    SettingsHomepageIcon(imageVector = Icons.Filled.Memory)
-                },
-                onClick = {
-                    when (modelState.status) {
-                        OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
-                            ocrClient.cancelDownload()
-                        OcrModelStatus.READY -> showDeleteDialog = true
-                        else -> showDownloadDialog = true
-                    }
-                },
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-            SettingsCategory(title = stringResource(R.string.category_experimental))
-            SwitchPreferenceRow(
-                title = stringResource(R.string.vulkan_backend),
-                summary = stringResource(R.string.vulkan_backend_summary),
-                checked = useVulkan,
-                onCheckedChange = { enabled ->
-                    useVulkan = enabled
-                    preferences.edit().putBoolean(PREF_USE_VULKAN, enabled).apply()
-                },
-                iconContent = {
-                    SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
-                },
-            )
+            }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        SettingsCategory(title = stringResource(R.string.category_diagnostics))
-        PreferenceRow(
-            title = stringResource(R.string.export_logs),
-            summary = "",
-            showSummary = false,
-            iconContent = {
-                SettingsHomepageIcon(imageVector = Icons.Filled.BugReport)
-            },
-            onClick = onExportLogs,
-        )
+        SettingsSection(title = stringResource(R.string.category_ocr_engine)) {
+            item {
+                PreferenceRow(
+                    title = stringResource(R.string.ocr_engine),
+                    summary = stringResource(
+                        if (ocrEngine == OcrEngine.LocalModel) {
+                            R.string.ocr_engine_local_model
+                        } else {
+                            R.string.ocr_engine_tesseract
+                        },
+                    ),
+                    iconContent = {
+                        SettingsHomepageIcon(imageVector = Icons.Filled.TextFields)
+                    },
+                    onClick = { showEngineDialog = true },
+                )
+            }
+        }
+
+        if (ocrEngine == OcrEngine.LocalModel) {
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsSection(title = stringResource(R.string.category_model)) {
+                item {
+                    PreferenceRow(
+                        title = stringResource(R.string.model_status),
+                        summary = modelStatusText(modelState),
+                        iconContent = {
+                            SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
+                        },
+                        onClick = {},
+                    )
+                }
+                item {
+                    PreferenceRow(
+                        title = when (modelState.status) {
+                            OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
+                                stringResource(R.string.cancel_download)
+                            OcrModelStatus.READY -> stringResource(R.string.delete_model)
+                            else -> stringResource(R.string.download_model)
+                        },
+                        summary = modelActionSummary(modelState),
+                        showSummary = modelState.totalBytes > 0,
+                        enabled = modelState.connected,
+                        iconContent = {
+                            SettingsHomepageIcon(imageVector = Icons.Filled.Memory)
+                        },
+                        onClick = {
+                            when (modelState.status) {
+                                OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
+                                    ocrClient.cancelDownload()
+                                OcrModelStatus.READY -> showDeleteDialog = true
+                                else -> showDownloadDialog = true
+                            }
+                        },
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            SettingsSection(title = stringResource(R.string.category_experimental)) {
+                item {
+                    SwitchPreferenceRow(
+                        title = stringResource(R.string.vulkan_backend),
+                        summary = stringResource(R.string.vulkan_backend_summary),
+                        checked = useVulkan,
+                        onCheckedChange = { enabled ->
+                            useVulkan = enabled
+                            preferences.edit().putBoolean(PREF_USE_VULKAN, enabled).apply()
+                        },
+                        iconContent = {
+                            SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
+                        },
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        SettingsSection(title = stringResource(R.string.category_diagnostics)) {
+            item {
+                PreferenceRow(
+                    title = stringResource(R.string.export_logs),
+                    summary = "",
+                    showSummary = false,
+                    iconContent = {
+                        SettingsHomepageIcon(imageVector = Icons.Filled.BugReport)
+                    },
+                    onClick = onExportLogs,
+                )
+            }
+        }
     }
 
     if (showDownloadDialog) {
