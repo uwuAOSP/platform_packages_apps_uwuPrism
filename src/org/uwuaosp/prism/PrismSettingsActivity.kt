@@ -24,6 +24,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.filled.SwipeUp
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -197,6 +199,7 @@ private fun PrismSettingsScreen(
         showBackButton = true,
         onNavigateUp = onNavigateUp,
     ) {
+        OcrDownloadProgress(state = modelState, onCancel = ocrClient::cancelDownload)
         SettingsSection(title = stringResource(R.string.category_capture)) {
             item {
                 SwitchPreferenceRow(
@@ -250,16 +253,6 @@ private fun PrismSettingsScreen(
                         },
                         onClick = {},
                     )
-                    if (modelState.status == OcrModelStatus.DOWNLOADING) {
-                        LinearProgressIndicator(
-                            progress = { modelState.progressPercent / 100f },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                        )
-                    } else if (modelState.status == OcrModelStatus.VERIFYING) {
-                        LinearProgressIndicator(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
-                        )
-                    }
                 }
                 item {
                     PreferenceRow(
@@ -418,6 +411,55 @@ private fun PrismSettingsScreen(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun OcrDownloadProgress(state: OcrModelState, onCancel: () -> Unit) {
+    if (state.status != OcrModelStatus.DOWNLOADING && state.status != OcrModelStatus.VERIFYING) {
+        return
+    }
+
+    // This is page content, not a preference-group item or a Pudding card.
+    // Keep active transfers visible even if the user switches OCR engines.
+    Column(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text =
+                        if (state.status == OcrModelStatus.DOWNLOADING) {
+                            stringResource(R.string.model_downloading, state.progressPercent)
+                        } else {
+                            stringResource(R.string.model_verifying)
+                        },
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                if (state.totalBytes > 0) {
+                    Text(
+                        text = modelActionSummary(state),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            TextButton(onClick = onCancel, enabled = state.connected) {
+                Text(stringResource(R.string.cancel_download))
+            }
+        }
+        if (state.status == OcrModelStatus.DOWNLOADING) {
+            LinearProgressIndicator(
+                progress = { state.progressPercent.coerceIn(0, 100) / 100f },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
     }
 }
 
