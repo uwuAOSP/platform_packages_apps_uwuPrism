@@ -158,7 +158,19 @@ internal class OcrClient(private val context: Context) {
     }
 
     fun startDownload() {
-        service?.startDownload()
+        // Start the shared downloader independently of this screen's binding.
+        runCatching {
+            context.startForegroundService(
+                Intent("org.uwuaosp.aicore.action.DOWNLOAD_OCR_MODEL")
+                    .setComponent(ComponentName(AI_CORE_PACKAGE, "$AI_CORE_PACKAGE.ocr.OcrService")),
+            )
+        }.onFailure { error ->
+            Log.e(TAG, "Could not start OCR model download", error)
+            _modelState.value = _modelState.value.copy(
+                status = OcrModelStatus.ERROR,
+                error = error.message ?: "Could not start OCR model download",
+            )
+        }
     }
 
     fun cancelDownload() {

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.SwipeUp
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -249,6 +250,16 @@ private fun PrismSettingsScreen(
                         },
                         onClick = {},
                     )
+                    if (modelState.status == OcrModelStatus.DOWNLOADING) {
+                        LinearProgressIndicator(
+                            progress = { modelState.progressPercent / 100f },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        )
+                    } else if (modelState.status == OcrModelStatus.VERIFYING) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+                        )
+                    }
                 }
                 item {
                     PreferenceRow(
