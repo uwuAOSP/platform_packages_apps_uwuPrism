@@ -62,11 +62,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.concurrent.thread
-import org.uwuaosp.compose.settingslib.PreferenceRow
-import org.uwuaosp.compose.settingslib.SettingsHomepageIcon
-import org.uwuaosp.compose.settingslib.SettingsScaffold
-import org.uwuaosp.compose.settingslib.SettingsSection
-import org.uwuaosp.compose.settingslib.SwitchPreferenceRow
+import org.uwuaosp.compose.widget.preference.PreferenceRow
+import org.uwuaosp.compose.widget.preference.SettingsSection
+import org.uwuaosp.compose.widget.preference.SwitchPreferenceRow
+import org.uwuaosp.compose.widget.scaffold.SettingsScaffold
+import org.uwuaosp.compose.widget.ui.SettingsHomepageIcon
 
 class PrismSettingsActivity : ComponentActivity() {
     private lateinit var ocrClient: OcrClient
