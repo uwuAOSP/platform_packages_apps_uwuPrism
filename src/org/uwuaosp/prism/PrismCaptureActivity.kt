@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:OptIn(ExperimentalMaterial3ExpressiveApi::class)
+
 package org.uwuaosp.prism
 
 import android.content.ClipData
@@ -39,48 +41,38 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ButtonGroupDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.ToggleButton
-import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -101,16 +93,10 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import java.io.File
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -124,6 +110,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.uwuaosp.compose.widget.expressive.SettingsButtonSize
+import org.uwuaosp.compose.widget.expressive.SettingsConnectedButtonGroup
+import org.uwuaosp.compose.widget.expressive.SettingsSplitButton
+import org.uwuaosp.compose.widget.menu.SettingsMenuGroup
+import org.uwuaosp.compose.widget.menu.SettingsMenuItem
 
 class PrismCaptureActivity : ComponentActivity() {
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -132,17 +123,16 @@ class PrismCaptureActivity : ComponentActivity() {
     private lateinit var ocrEngine: OcrEngine
     private var screenshotUri: Uri? = null
 
-    private val pdfExporter = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("application/pdf"),
-    ) { uri ->
-        uri?.let { controller.exportDocument(ExportType.Pdf, it) }
-    }
+    private val pdfExporter =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { uri
+            ->
+            uri?.let { controller.exportDocument(ExportType.Pdf, it) }
+        }
 
-    private val textExporter = registerForActivityResult(
-        ActivityResultContracts.CreateDocument("text/plain"),
-    ) { uri ->
-        uri?.let { controller.exportDocument(ExportType.Text, it) }
-    }
+    private val textExporter =
+        registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+            uri?.let { controller.exportDocument(ExportType.Text, it) }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -162,10 +152,9 @@ class PrismCaptureActivity : ComponentActivity() {
         if (ocrEngine == OcrEngine.LocalModel) {
             ocrClient.connect(
                 prewarmOcr = true,
-                useVulkan = getSharedPreferences(
-                    PRISM_PREFERENCES,
-                    Context.MODE_PRIVATE,
-                ).getBoolean(PREF_USE_VULKAN, false),
+                useVulkan =
+                    getSharedPreferences(PRISM_PREFERENCES, Context.MODE_PRIVATE)
+                        .getBoolean(PREF_USE_VULKAN, false),
             )
         }
 
@@ -177,7 +166,7 @@ class PrismCaptureActivity : ComponentActivity() {
                         modifier = Modifier.fillMaxSize().background(Color.Black),
                         contentAlignment = Alignment.Center,
                     ) {
-                        CircularProgressIndicator()
+                        LoadingIndicator()
                     }
                 } else {
                     CaptureScreen(
@@ -185,29 +174,28 @@ class PrismCaptureActivity : ComponentActivity() {
                         modelState = ocrClient.modelState.collectAsState().value,
                         ocrEngine = ocrEngine,
                         onClose = ::finish,
-                        onExportPdf = {
-                            pdfExporter.launch(getString(R.string.pdf_file_name))
-                        },
-                        onExportText = {
-                            textExporter.launch(getString(R.string.txt_file_name))
-                        },
+                        onExportPdf = { pdfExporter.launch(getString(R.string.pdf_file_name)) },
+                        onExportText = { textExporter.launch(getString(R.string.txt_file_name)) },
                     )
                 }
             }
         }
 
         activityScope.launch {
-            val loaded = withContext(Dispatchers.IO) {
-                runCatching {
-                    contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
-                }.getOrNull()
-            }
+            val loaded =
+                withContext(Dispatchers.IO) {
+                    runCatching {
+                            contentResolver.openInputStream(uri)?.use(BitmapFactory::decodeStream)
+                        }
+                        .getOrNull()
+                }
             if (loaded == null) {
                 Toast.makeText(
-                    this@PrismCaptureActivity,
-                    R.string.capture_failed,
-                    Toast.LENGTH_LONG,
-                ).show()
+                        this@PrismCaptureActivity,
+                        R.string.capture_failed,
+                        Toast.LENGTH_LONG,
+                    )
+                    .show()
                 finish()
             } else {
                 controller.setBitmap(loaded)
@@ -453,9 +441,9 @@ private fun CaptureScreen(
     LaunchedEffect(ocrEngine, modelState.connected, modelState.status) {
         if (
             ocrEngine == OcrEngine.LocalModel &&
-            modelState.connected &&
-            modelState.status == OcrModelStatus.MISSING &&
-            !promptedForMissingModel
+                modelState.connected &&
+                modelState.status == OcrModelStatus.MISSING &&
+                !promptedForMissingModel
         ) {
             promptedForMissingModel = true
             controller.showModelDownloadDialog = true
@@ -465,14 +453,13 @@ private fun CaptureScreen(
     BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         val imageAspectRatio = bitmap.width.toFloat() / bitmap.height
         val viewportAspectRatio = constraints.maxWidth.toFloat() / constraints.maxHeight
-        val imageModifier = if (imageAspectRatio > viewportAspectRatio) {
-            Modifier.fillMaxWidth().aspectRatio(imageAspectRatio)
-        } else {
-            Modifier.fillMaxHeight().aspectRatio(
-                imageAspectRatio,
-                matchHeightConstraintsFirst = true,
-            )
-        }
+        val imageModifier =
+            if (imageAspectRatio > viewportAspectRatio) {
+                Modifier.fillMaxWidth().aspectRatio(imageAspectRatio)
+            } else {
+                Modifier.fillMaxHeight()
+                    .aspectRatio(imageAspectRatio, matchHeightConstraintsFirst = true)
+            }
         Box(modifier = imageModifier.align(Alignment.Center)) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
@@ -508,9 +495,7 @@ private fun CaptureScreen(
                 controller.exportImages()
             },
         )
-        controller.busyMessage?.let { message ->
-            BusyOverlay(message)
-        }
+        controller.busyMessage?.let { message -> BusyOverlay(message) }
     }
 
     if (controller.showModelDownloadDialog) {
@@ -519,13 +504,17 @@ private fun CaptureScreen(
             title = { Text(stringResource(R.string.model_download_title)) },
             text = { Text(stringResource(R.string.model_download_message)) },
             confirmButton = {
-                TextButton(onClick = controller::startModelDownload) {
+                TextButton(
+                    onClick = controller::startModelDownload,
+                    shapes = ButtonDefaults.shapes(),
+                ) {
                     Text(stringResource(R.string.download))
                 }
             },
             dismissButton = {
                 TextButton(
                     onClick = { controller.showModelDownloadDialog = false },
+                    shapes = ButtonDefaults.shapes(),
                 ) {
                     Text(stringResource(R.string.cancel))
                 }
@@ -543,11 +532,11 @@ private fun BoxScope.CaptureTopControls(
 ) {
     val statusPadding = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Surface(
-        modifier = Modifier
-            .align(Alignment.TopStart)
-            .padding(start = 16.dp, top = statusPadding + 12.dp)
-            .size(48.dp)
-            .clickable(onClick = onClose),
+        modifier =
+            Modifier.align(Alignment.TopStart)
+                .padding(start = 16.dp, top = statusPadding + 12.dp)
+                .size(48.dp)
+                .clickable(onClick = onClose),
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
         tonalElevation = 3.dp,
@@ -561,16 +550,11 @@ private fun BoxScope.CaptureTopControls(
     }
 
     Column(
-        modifier = Modifier
-            .align(Alignment.TopCenter)
-            .padding(top = statusPadding + 12.dp),
+        modifier = Modifier.align(Alignment.TopCenter).padding(top = statusPadding + 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        CompactKindSelector(
-            currentKind = currentKind,
-            onKindChanged = onKindChanged,
-        )
+        CompactKindSelector(currentKind = currentKind, onKindChanged = onKindChanged)
         Surface(
             shape = RoundedCornerShape(18.dp),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
@@ -584,7 +568,7 @@ private fun BoxScope.CaptureTopControls(
         }
         if (
             modelState.status == OcrModelStatus.DOWNLOADING ||
-            modelState.status == OcrModelStatus.VERIFYING
+                modelState.status == OcrModelStatus.VERIFYING
         ) {
             Surface(
                 shape = RoundedCornerShape(18.dp),
@@ -595,17 +579,18 @@ private fun BoxScope.CaptureTopControls(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     Text(
-                        text = if (modelState.status == OcrModelStatus.VERIFYING) {
-                            stringResource(R.string.model_verifying)
-                        } else {
-                            stringResource(
-                                R.string.model_downloading,
-                                modelState.progressPercent,
-                            )
-                        },
+                        text =
+                            if (modelState.status == OcrModelStatus.VERIFYING) {
+                                stringResource(R.string.model_verifying)
+                            } else {
+                                stringResource(
+                                    R.string.model_downloading,
+                                    modelState.progressPercent,
+                                )
+                            },
                         style = MaterialTheme.typography.labelMedium,
                     )
-                    LinearProgressIndicator(
+                    LinearWavyProgressIndicator(
                         progress = { modelState.progressPercent / 100f },
                         modifier = Modifier.width(160.dp),
                     )
@@ -616,87 +601,23 @@ private fun BoxScope.CaptureTopControls(
 }
 
 @Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun CompactKindSelector(
-    currentKind: RegionKind,
-    onKindChanged: (RegionKind) -> Unit,
-) {
-    val colors = ToggleButtonDefaults.toggleButtonColors(
-        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-    )
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(
-            ButtonGroupDefaults.ConnectedSpaceBetween,
-        ),
-    ) {
-        KindSegment(
-            selected = currentKind == RegionKind.Text,
-            leading = true,
-            colors = colors,
-            label = stringResource(R.string.selection_text),
-            icon = {
-                Icon(
-                    Icons.Filled.TextFields,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-            onClick = { onKindChanged(RegionKind.Text) },
-        )
-        KindSegment(
-            selected = currentKind == RegionKind.Image,
-            leading = false,
-            colors = colors,
-            label = stringResource(R.string.selection_image),
-            icon = {
-                Icon(
-                    Icons.Filled.Image,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            },
-            onClick = { onKindChanged(RegionKind.Image) },
-        )
-    }
-}
-
-@Composable
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun KindSegment(
-    selected: Boolean,
-    leading: Boolean,
-    colors: androidx.compose.material3.ToggleButtonColors,
-    label: String,
-    icon: @Composable () -> Unit,
-    onClick: () -> Unit,
-) {
-    val shapes = if (leading) {
-        ButtonGroupDefaults.connectedLeadingButtonShapes()
-    } else {
-        ButtonGroupDefaults.connectedTrailingButtonShapes()
-    }
-    ToggleButton(
-        checked = selected,
-        onCheckedChange = { checked ->
-            if (checked) onClick()
+private fun CompactKindSelector(currentKind: RegionKind, onKindChanged: (RegionKind) -> Unit) {
+    val kinds = listOf(RegionKind.Text, RegionKind.Image)
+    SettingsConnectedButtonGroup(
+        options =
+            listOf(
+                stringResource(R.string.selection_text),
+                stringResource(R.string.selection_image),
+            ),
+        selectedIndex = kinds.indexOf(currentKind),
+        onSelect = { onKindChanged(kinds[it]) },
+        leadingIcon = { index ->
+            Icon(
+                if (index == 0) Icons.Filled.TextFields else Icons.Filled.Image,
+                contentDescription = null,
+            )
         },
-        shapes = shapes,
-        colors = colors,
-        modifier = Modifier
-            .heightIn(min = 48.dp)
-            .width(104.dp),
-    ) {
-        icon()
-        Spacer(modifier = Modifier.width(7.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelLarge,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-        )
-    }
+    )
 }
 
 @Composable
@@ -708,96 +629,44 @@ private fun BoxScope.CaptureBottomControls(
     onExportText: () -> Unit,
     onExportImages: () -> Unit,
 ) {
-    val navigationPadding = WindowInsets.navigationBars
-        .asPaddingValues()
-        .calculateBottomPadding()
-    val moreExportsDescription = stringResource(R.string.more_exports)
-    Box(
-        modifier = Modifier
-            .align(Alignment.BottomCenter)
-            .padding(bottom = navigationPadding + 18.dp),
-    ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            Surface(
-                modifier = Modifier
-                    .height(60.dp)
-                    .width(154.dp)
-                    .clickable(onClick = onCopy),
-                shape = RoundedCornerShape(
-                    topStart = 30.dp,
-                    bottomStart = 30.dp,
-                    topEnd = 5.dp,
-                    bottomEnd = 5.dp,
-                ),
-                color = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shadowElevation = 5.dp,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    Icon(
-                        Icons.Filled.ContentCopy,
-                        contentDescription = null,
-                        modifier = Modifier.size(21.dp),
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = stringResource(R.string.copy),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                }
-            }
-            Box {
-                Surface(
-                    modifier = Modifier
-                        .height(60.dp)
-                        .width(62.dp)
-                        .clickable { onExpandedChange(true) }
-                        .semantics {
-                            contentDescription = moreExportsDescription
-                        },
-                    shape = RoundedCornerShape(
-                        topStart = 5.dp,
-                        bottomStart = 5.dp,
-                        topEnd = 30.dp,
-                        bottomEnd = 30.dp,
-                    ),
-                    color = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                    shadowElevation = 5.dp,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Filled.KeyboardArrowUp,
-                            contentDescription = stringResource(R.string.more_exports),
-                        )
-                    }
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { onExpandedChange(false) },
-                    modifier = Modifier.widthIn(min = 180.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                    tonalElevation = 0.dp,
-                    shadowElevation = 3.dp,
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.export_pdf)) },
-                        onClick = onExportPdf,
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.export_txt)) },
-                        onClick = onExportText,
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.export_images)) },
-                        onClick = onExportImages,
-                    )
-                }
+    Box(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(18.dp)) {
+        SettingsSplitButton(
+            label = stringResource(R.string.copy),
+            expanded = expanded,
+            onClick = onCopy,
+            onExpandedChange = onExpandedChange,
+            menuContentDescription = stringResource(R.string.more_exports),
+            size = SettingsButtonSize.Medium,
+            leadingIcon = Icons.Filled.ContentCopy,
+        ) {
+            SettingsMenuGroup {
+                SettingsMenuItem(
+                    text = stringResource(R.string.export_pdf),
+                    index = 0,
+                    itemCount = 3,
+                    onClick = {
+                        onExpandedChange(false)
+                        onExportPdf()
+                    },
+                )
+                SettingsMenuItem(
+                    text = stringResource(R.string.export_txt),
+                    index = 1,
+                    itemCount = 3,
+                    onClick = {
+                        onExpandedChange(false)
+                        onExportText()
+                    },
+                )
+                SettingsMenuItem(
+                    text = stringResource(R.string.export_images),
+                    index = 2,
+                    itemCount = 3,
+                    onClick = {
+                        onExpandedChange(false)
+                        onExportImages()
+                    },
+                )
             }
         }
     }
@@ -806,10 +675,10 @@ private fun BoxScope.CaptureBottomControls(
 @Composable
 private fun BusyOverlay(message: String) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.48f))
-            .pointerInput(message) {
+        modifier =
+            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.48f)).pointerInput(
+                message
+            ) {
                 awaitEachGesture {
                     awaitFirstDown(requireUnconsumed = false).consume()
                     var pointerPressed = true
@@ -832,7 +701,7 @@ private fun BusyOverlay(message: String) {
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                CircularProgressIndicator()
+                LoadingIndicator()
                 Text(text = message, style = MaterialTheme.typography.bodyLarge)
             }
         }
@@ -842,11 +711,8 @@ private fun BusyOverlay(message: String) {
 private sealed interface DragAction {
     val pointerId: PointerId
 
-    data class Create(
-        override val pointerId: PointerId,
-        val regionId: Long,
-        val start: Offset,
-    ) : DragAction
+    data class Create(override val pointerId: PointerId, val regionId: Long, val start: Offset) :
+        DragAction
 
     data class Move(
         override val pointerId: PointerId,
@@ -1115,9 +981,7 @@ private fun updateRegionForDrag(
     }
 }
 
-private fun SelectionRegion.toPixelRect(
-    size: androidx.compose.ui.unit.IntSize,
-): RectF {
+private fun SelectionRegion.toPixelRect(size: androidx.compose.ui.unit.IntSize): RectF {
     val region = normalized()
     return RectF(
         region.left * size.width,
