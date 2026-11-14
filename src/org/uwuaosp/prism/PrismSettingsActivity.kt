@@ -16,7 +16,6 @@
 
 package org.uwuaosp.prism
 
-import android.content.Context
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
@@ -24,35 +23,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BugReport
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.SwipeUp
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -69,8 +51,6 @@ import org.uwuaosp.compose.widget.scaffold.SettingsScaffold
 import org.uwuaosp.compose.widget.ui.SettingsHomepageIcon
 
 class PrismSettingsActivity : ComponentActivity() {
-    private lateinit var ocrClient: OcrClient
-
     private val logExporter = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/plain"),
     ) { uri ->
@@ -113,11 +93,9 @@ class PrismSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        ocrClient = OcrClient(this)
         setContent {
             PrismTheme {
                 PrismSettingsScreen(
-                    ocrClient = ocrClient,
                     onNavigateUp = ::finish,
                     onExportLogs = {
                         val timestamp = SimpleDateFormat(
@@ -131,28 +109,14 @@ class PrismSettingsActivity : ComponentActivity() {
         }
     }
 
-    override fun onStart() {
-        super.onStart()
-        ocrClient.connect()
-    }
-
-    override fun onStop() {
-        ocrClient.disconnect()
-        super.onStop()
-    }
 }
 
 @Composable
 private fun PrismSettingsScreen(
-    ocrClient: OcrClient,
     onNavigateUp: () -> Unit,
     onExportLogs: () -> Unit,
 ) {
     val context = LocalContext.current
-    val modelState by ocrClient.modelState.collectAsState()
-    val preferences = remember {
-        context.getSharedPreferences(PRISM_PREFERENCES, Context.MODE_PRIVATE)
-    }
     var gestureEnabled by remember {
         mutableStateOf(
             Settings.Secure.getInt(
@@ -162,44 +126,12 @@ private fun PrismSettingsScreen(
             ) != 0,
         )
     }
-    var useVulkan by remember {
-        mutableStateOf(preferences.getBoolean(PREF_USE_VULKAN, false))
-    }
-    var ocrEngine by remember {
-        mutableStateOf(
-            OcrEngine.fromPreference(
-                preferences.getString(PREF_OCR_ENGINE, OcrEngine.Tesseract.preferenceValue),
-            ),
-        )
-    }
-    var showEngineDialog by remember { mutableStateOf(false) }
-    var showDownloadDialog by remember { mutableStateOf(false) }
-    var showDeleteDialog by remember { mutableStateOf(false) }
-    var promptedForMissingModel by remember { mutableStateOf(false) }
-    val selectOcrEngine: (OcrEngine) -> Unit = { candidate ->
-        ocrEngine = candidate
-        preferences.edit().putString(PREF_OCR_ENGINE, candidate.preferenceValue).apply()
-        showEngineDialog = false
-    }
-
-    LaunchedEffect(modelState.connected, modelState.status) {
-        if (
-            ocrEngine == OcrEngine.LocalModel &&
-            modelState.connected &&
-            modelState.status == OcrModelStatus.MISSING &&
-            !promptedForMissingModel
-        ) {
-            promptedForMissingModel = true
-            showDownloadDialog = true
-        }
-    }
 
     SettingsScaffold(
         title = stringResource(R.string.app_name),
         showBackButton = true,
         onNavigateUp = onNavigateUp,
     ) {
-        OcrDownloadProgress(state = modelState, onCancel = ocrClient::cancelDownload)
         SettingsSection(title = stringResource(R.string.category_capture)) {
             item {
                 SwitchPreferenceRow(
@@ -225,77 +157,13 @@ private fun PrismSettingsScreen(
         SettingsSection(title = stringResource(R.string.category_ocr_engine)) {
             item {
                 PreferenceRow(
-                    title = stringResource(R.string.ocr_engine),
-                    summary = stringResource(
-                        if (ocrEngine == OcrEngine.LocalModel) {
-                            R.string.ocr_engine_local_model
-                        } else {
-                            R.string.ocr_engine_tesseract
-                        },
-                    ),
+                    title = stringResource(R.string.ocr_engine_tesseract),
+                    summary = stringResource(R.string.ocr_engine_tesseract_summary),
                     iconContent = {
                         SettingsHomepageIcon(imageVector = Icons.Filled.TextFields)
                     },
-                    onClick = { showEngineDialog = true },
+                    onClick = {},
                 )
-            }
-        }
-
-        if (ocrEngine == OcrEngine.LocalModel) {
-            Spacer(modifier = Modifier.height(8.dp))
-            SettingsSection(title = stringResource(R.string.category_model)) {
-                item {
-                    PreferenceRow(
-                        title = stringResource(R.string.model_status),
-                        summary = modelStatusText(modelState),
-                        iconContent = {
-                            SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
-                        },
-                        onClick = {},
-                    )
-                }
-                item {
-                    PreferenceRow(
-                        title = when (modelState.status) {
-                            OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
-                                stringResource(R.string.cancel_download)
-                            OcrModelStatus.READY -> stringResource(R.string.delete_model)
-                            else -> stringResource(R.string.download_model)
-                        },
-                        summary = modelActionSummary(modelState),
-                        showSummary = modelState.totalBytes > 0,
-                        enabled = modelState.connected,
-                        iconContent = {
-                            SettingsHomepageIcon(imageVector = Icons.Filled.Memory)
-                        },
-                        onClick = {
-                            when (modelState.status) {
-                                OcrModelStatus.DOWNLOADING, OcrModelStatus.VERIFYING ->
-                                    ocrClient.cancelDownload()
-                                OcrModelStatus.READY -> showDeleteDialog = true
-                                else -> showDownloadDialog = true
-                            }
-                        },
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-            SettingsSection(title = stringResource(R.string.category_experimental)) {
-                item {
-                    SwitchPreferenceRow(
-                        title = stringResource(R.string.vulkan_backend),
-                        summary = stringResource(R.string.vulkan_backend_summary),
-                        checked = useVulkan,
-                        onCheckedChange = { enabled ->
-                            useVulkan = enabled
-                            preferences.edit().putBoolean(PREF_USE_VULKAN, enabled).apply()
-                        },
-                        iconContent = {
-                            SettingsHomepageIcon(imageVector = Icons.Filled.AutoAwesome)
-                        },
-                    )
-                }
             }
         }
 
@@ -315,178 +183,6 @@ private fun PrismSettingsScreen(
         }
     }
 
-    if (showDownloadDialog) {
-        AlertDialog(
-            onDismissRequest = { showDownloadDialog = false },
-            title = { Text(stringResource(R.string.model_download_title)) },
-            text = { Text(stringResource(R.string.model_download_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDownloadDialog = false
-                        ocrClient.startDownload()
-                    },
-                ) {
-                    Text(stringResource(R.string.download))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDownloadDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
-
-    if (showEngineDialog) {
-        AlertDialog(
-            onDismissRequest = { showEngineDialog = false },
-            title = { Text(stringResource(R.string.ocr_engine)) },
-            text = {
-                Column {
-                    OcrEngine.entries.forEach { candidate ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selectOcrEngine(candidate)
-                                }
-                                .padding(vertical = 8.dp),
-                        ) {
-                            RadioButton(
-                                selected = candidate == ocrEngine,
-                                onClick = { selectOcrEngine(candidate) },
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column {
-                                Text(
-                                    stringResource(
-                                        if (candidate == OcrEngine.LocalModel) {
-                                            R.string.ocr_engine_local_model
-                                        } else {
-                                            R.string.ocr_engine_tesseract
-                                        },
-                                    ),
-                                )
-                                Text(
-                                    stringResource(
-                                        if (candidate == OcrEngine.LocalModel) {
-                                            R.string.ocr_engine_local_model_summary
-                                        } else {
-                                            R.string.ocr_engine_tesseract_summary
-                                        },
-                                    ),
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showEngineDialog = false }) {
-                    Text(stringResource(R.string.close))
-                }
-            },
-        )
-    }
-
-    if (showDeleteDialog) {
-        AlertDialog(
-            onDismissRequest = { showDeleteDialog = false },
-            title = { Text(stringResource(R.string.model_delete_title)) },
-            text = { Text(stringResource(R.string.model_delete_message)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteDialog = false
-                        ocrClient.deleteModels()
-                    },
-                ) {
-                    Text(stringResource(R.string.delete))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteDialog = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
 }
 
-@Composable
-private fun OcrDownloadProgress(state: OcrModelState, onCancel: () -> Unit) {
-    if (state.status != OcrModelStatus.DOWNLOADING && state.status != OcrModelStatus.VERIFYING) {
-        return
-    }
-
-    // This is page content, not a preference-group item or a Pudding card.
-    // Keep active transfers visible even if the user switches OCR engines.
-    Column(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text =
-                        if (state.status == OcrModelStatus.DOWNLOADING) {
-                            stringResource(R.string.model_downloading, state.progressPercent)
-                        } else {
-                            stringResource(R.string.model_verifying)
-                        },
-                    style = MaterialTheme.typography.titleSmall,
-                )
-                if (state.totalBytes > 0) {
-                    Text(
-                        text = modelActionSummary(state),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            TextButton(onClick = onCancel, enabled = state.connected) {
-                Text(stringResource(R.string.cancel_download))
-            }
-        }
-        if (state.status == OcrModelStatus.DOWNLOADING) {
-            LinearProgressIndicator(
-                progress = { state.progressPercent.coerceIn(0, 100) / 100f },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        } else {
-            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-        }
-    }
-}
-
-@Composable
-private fun modelStatusText(state: OcrModelState): String {
-    return when {
-        !state.connected -> stringResource(R.string.service_unavailable)
-        state.status == OcrModelStatus.MISSING -> stringResource(R.string.model_missing)
-        state.status == OcrModelStatus.DOWNLOADING ->
-            stringResource(R.string.model_downloading, state.progressPercent)
-        state.status == OcrModelStatus.VERIFYING -> stringResource(R.string.model_verifying)
-        state.status == OcrModelStatus.READY -> stringResource(R.string.model_ready)
-        else -> state.error ?: stringResource(R.string.model_error)
-    }
-}
-
-@Composable
-private fun modelActionSummary(state: OcrModelState): String {
-    if (state.totalBytes <= 0) return ""
-    val megabyte = 1_000_000.0
-    return stringResource(
-        R.string.download_progress,
-        state.downloadedBytes / megabyte,
-        state.totalBytes / megabyte,
-    )
-}
-
-internal const val PRISM_PREFERENCES = "uwu_prism_preferences"
-internal const val PREF_USE_VULKAN = "use_vulkan"
-internal const val PREF_OCR_ENGINE = "ocr_engine"
+internal const val THREE_FINGER_SETTING = "uwu_prism_three_finger_gesture"

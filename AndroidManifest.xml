@@ -19,7 +19,10 @@
 
     <uses-permission android:name="android.permission.READ_LOGS" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
-    <uses-permission android:name="org.uwuaosp.aicore.permission.USE_OCR" />
+
+    <permission
+        android:name="org.uwuaosp.prism.permission.CAPTURE"
+        android:protectionLevel="signature" />
 
     <application
         android:allowBackup="false"
@@ -45,7 +48,7 @@
             android:excludeFromRecents="true"
             android:exported="true"
             android:label="@string/capture_title"
-            android:permission="org.uwuaosp.aicore.permission.USE_OCR"
+            android:permission="org.uwuaosp.prism.permission.CAPTURE"
             android:theme="@style/Theme.Prism.Capture" />
     </application>
 </manifest>

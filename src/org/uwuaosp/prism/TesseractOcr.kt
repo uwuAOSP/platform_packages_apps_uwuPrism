@@ -22,25 +22,6 @@ import java.io.FileOutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-internal enum class OcrEngine(val preferenceValue: String) {
-    LocalModel("local_model"),
-    Tesseract("tesseract"),
-    ;
-
-    companion object {
-        fun fromPreference(value: String?): OcrEngine {
-            return entries.firstOrNull { it.preferenceValue == value } ?: LocalModel
-        }
-    }
-}
-
-internal fun selectedOcrEngine(context: Context): OcrEngine {
-    return OcrEngine.fromPreference(
-        context.getSharedPreferences(PRISM_PREFERENCES, Context.MODE_PRIVATE)
-            .getString(PREF_OCR_ENGINE, OcrEngine.Tesseract.preferenceValue),
-    )
-}
-
 internal object TesseractOcr {
     private const val TESSDATA_DIRECTORY = "tessdata"
     private val languageFiles = listOf("chi_sim.traineddata", "eng.traineddata")

@@ -67,22 +67,18 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.TextFields
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -127,9 +123,7 @@ import kotlinx.coroutines.withContext
 
 class PrismCaptureActivity : ComponentActivity() {
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private lateinit var ocrClient: OcrClient
     private lateinit var controller: CaptureController
-    private lateinit var ocrEngine: OcrEngine
     private var screenshotUri: Uri? = null
 
     private val pdfExporter = registerForActivityResult(
@@ -156,18 +150,7 @@ class PrismCaptureActivity : ComponentActivity() {
             return
         }
 
-        ocrEngine = selectedOcrEngine(this)
-        ocrClient = OcrClient(this)
-        controller = CaptureController(this, ocrClient, activityScope, ocrEngine)
-        if (ocrEngine == OcrEngine.LocalModel) {
-            ocrClient.connect(
-                prewarmOcr = true,
-                useVulkan = getSharedPreferences(
-                    PRISM_PREFERENCES,
-                    Context.MODE_PRIVATE,
-                ).getBoolean(PREF_USE_VULKAN, false),
-            )
-        }
+        controller = CaptureController(this, activityScope)
 
         setContent {
             PrismTheme {
@@ -182,8 +165,6 @@ class PrismCaptureActivity : ComponentActivity() {
                 } else {
                     CaptureScreen(
                         controller = controller,
-                        modelState = ocrClient.modelState.collectAsState().value,
-                        ocrEngine = ocrEngine,
                         onClose = ::finish,
                         onExportPdf = {
                             pdfExporter.launch(getString(R.string.pdf_file_name))
@@ -219,9 +200,6 @@ class PrismCaptureActivity : ComponentActivity() {
         if (::controller.isInitialized) {
             controller.cancel()
         }
-        if (::ocrClient.isInitialized) {
-            ocrClient.disconnect()
-        }
         activityScope.cancel()
         if (!isChangingConfigurations) {
             clearTemporaryCrops(this)
@@ -249,9 +227,7 @@ private enum class ExportType {
 
 private class CaptureController(
     private val context: Context,
-    private val ocrClient: OcrClient,
     private val scope: CoroutineScope,
-    private val ocrEngine: OcrEngine,
 ) {
     private val _bitmap = MutableStateFlow<Bitmap?>(null)
     val bitmap: StateFlow<Bitmap?> = _bitmap.asStateFlow()
@@ -260,7 +236,6 @@ private class CaptureController(
     var selectionKind by mutableStateOf(RegionKind.Text)
     var busyMessage by mutableStateOf<String?>(null)
         private set
-    var showModelDownloadDialog by mutableStateOf(false)
     var exportMenuExpanded by mutableStateOf(false)
     private var operation: Job? = null
 
@@ -272,7 +247,6 @@ private class CaptureController(
         val source = _bitmap.value ?: return
         if (!validateSelections()) return
         val textSelections = selections.filter { it.kind == RegionKind.Text }
-        if (textSelections.isNotEmpty() && !ensureModelReady()) return
         runOperation {
             val processed = recognizeSelections(source, textSelections)
             try {
@@ -315,8 +289,6 @@ private class CaptureController(
     fun exportDocument(type: ExportType, uri: Uri) {
         val source = _bitmap.value ?: return
         if (!validateSelections()) return
-        val needsOcr = selections.any { it.kind == RegionKind.Text }
-        if (needsOcr && !ensureModelReady()) return
         runOperation {
             val sourceSelections = when (type) {
                 ExportType.Pdf -> selections.toList()
@@ -335,11 +307,6 @@ private class CaptureController(
         }
     }
 
-    fun startModelDownload() {
-        showModelDownloadDialog = false
-        ocrClient.startDownload()
-    }
-
     fun cancel() {
         val source = _bitmap.value
         _bitmap.value = null
@@ -355,14 +322,6 @@ private class CaptureController(
     private fun validateSelections(): Boolean {
         if (selections.isNotEmpty()) return true
         toast(context.getString(R.string.nothing_selected))
-        return false
-    }
-
-    private fun ensureModelReady(): Boolean {
-        if (ocrEngine == OcrEngine.Tesseract) return true
-        val state = ocrClient.modelState.value
-        if (state.status == OcrModelStatus.READY) return true
-        showModelDownloadDialog = true
         return false
     }
 
@@ -404,16 +363,7 @@ private class CaptureController(
                         )
                         val file = writeTemporaryCrop(context, crop, selection.id)
                         val text = try {
-                            when (ocrEngine) {
-                                OcrEngine.LocalModel -> {
-                                    val useVulkan = context.getSharedPreferences(
-                                        PRISM_PREFERENCES,
-                                        Context.MODE_PRIVATE,
-                                    ).getBoolean(PREF_USE_VULKAN, false)
-                                    ocrClient.recognize(file, useVulkan)
-                                }
-                                OcrEngine.Tesseract -> TesseractOcr.recognize(context, file)
-                            }
+                            TesseractOcr.recognize(context, file)
                         } finally {
                             file.delete()
                         }
@@ -441,27 +391,11 @@ private class CaptureController(
 @Composable
 private fun CaptureScreen(
     controller: CaptureController,
-    modelState: OcrModelState,
-    ocrEngine: OcrEngine,
     onClose: () -> Unit,
     onExportPdf: () -> Unit,
     onExportText: () -> Unit,
 ) {
     val bitmap = controller.bitmap.collectAsState().value ?: return
-    var promptedForMissingModel by remember { mutableStateOf(false) }
-
-    LaunchedEffect(ocrEngine, modelState.connected, modelState.status) {
-        if (
-            ocrEngine == OcrEngine.LocalModel &&
-            modelState.connected &&
-            modelState.status == OcrModelStatus.MISSING &&
-            !promptedForMissingModel
-        ) {
-            promptedForMissingModel = true
-            controller.showModelDownloadDialog = true
-        }
-    }
-
     BoxWithConstraints(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         val imageAspectRatio = bitmap.width.toFloat() / bitmap.height
         val viewportAspectRatio = constraints.maxWidth.toFloat() / constraints.maxHeight
@@ -487,7 +421,6 @@ private fun CaptureScreen(
         }
         CaptureTopControls(
             currentKind = controller.selectionKind,
-            modelState = modelState,
             onKindChanged = { controller.selectionKind = it },
             onClose = onClose,
         )
@@ -513,31 +446,11 @@ private fun CaptureScreen(
         }
     }
 
-    if (controller.showModelDownloadDialog) {
-        AlertDialog(
-            onDismissRequest = { controller.showModelDownloadDialog = false },
-            title = { Text(stringResource(R.string.model_download_title)) },
-            text = { Text(stringResource(R.string.model_download_message)) },
-            confirmButton = {
-                TextButton(onClick = controller::startModelDownload) {
-                    Text(stringResource(R.string.download))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { controller.showModelDownloadDialog = false },
-                ) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
 }
 
 @Composable
 private fun BoxScope.CaptureTopControls(
     currentKind: RegionKind,
-    modelState: OcrModelState,
     onKindChanged: (RegionKind) -> Unit,
     onClose: () -> Unit,
 ) {
@@ -581,36 +494,6 @@ private fun BoxScope.CaptureTopControls(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
             )
-        }
-        if (
-            modelState.status == OcrModelStatus.DOWNLOADING ||
-            modelState.status == OcrModelStatus.VERIFYING
-        ) {
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-            ) {
-                Column(
-                    modifier = Modifier.width(180.dp).padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = if (modelState.status == OcrModelStatus.VERIFYING) {
-                            stringResource(R.string.model_verifying)
-                        } else {
-                            stringResource(
-                                R.string.model_downloading,
-                                modelState.progressPercent,
-                            )
-                        },
-                        style = MaterialTheme.typography.labelMedium,
-                    )
-                    LinearProgressIndicator(
-                        progress = { modelState.progressPercent / 100f },
-                        modifier = Modifier.width(160.dp),
-                    )
-                }
-            }
         }
     }
 }
